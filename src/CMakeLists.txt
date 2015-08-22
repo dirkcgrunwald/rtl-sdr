@@ -97,8 +97,10 @@ target_link_libraries(rtl_adsb convenience_static rtlsdr_shared
     ${LIBUSB_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
+MESSAGE(STATUS "LIBGPS is ${LIBGPS_LIBRARIES}")
 target_link_libraries(rtl_power convenience_static rtlsdr_shared
     ${LIBUSB_LIBRARIES}
+    ${LIBGPS_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
 if(UNIX)

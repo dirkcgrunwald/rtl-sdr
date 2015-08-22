@@ -72,6 +72,14 @@ endif()
 if(NOT THREADS_FOUND)
     message(FATAL_ERROR "pthreads(-win32) required to compile rtl-sdr")
 endif()
+
+option(GPS_POWER "Record GPS location in rtl-power" ON)
+if (GPS_POWER)
+   find_package(LibGPS)
+   add_definitions(-DGPS_POWER)
+endif (GPS_POWER)
+
+
 ########################################################################
 # Setup the include and linker paths
 ########################################################################
@@ -103,7 +111,7 @@ add_custom_target(uninstall
 ########################################################################
 # Install udev rules
 ########################################################################
-option(INSTALL_UDEV_RULES "Install udev rules for RTL-SDR" OFF)
+option(INSTALL_UDEV_RULES "Install udev rules for RTL-SDR" ON)
 if (INSTALL_UDEV_RULES)
     install (
         FILES rtl-sdr.rules
@@ -114,7 +122,7 @@ else (INSTALL_UDEV_RULES)
     message (STATUS "Udev rules not being installed, install them with -DINSTALL_UDEV_RULES=ON")
 endif (INSTALL_UDEV_RULES)
 
-option(DETACH_KERNEL_DRIVER "Detach kernel driver if loaded" OFF)
+option(DETACH_KERNEL_DRIVER "Detach kernel driver if loaded" ON)
 if (DETACH_KERNEL_DRIVER)
     message (STATUS "Building with kernel driver detaching enabled")
     add_definitions(-DDETACH_KERNEL_DRIVER=1)
@@ -136,6 +144,14 @@ FOREACH(inc ${LIBUSB_INCLUDE_DIR})
 ENDFOREACH(inc)
 
 FOREACH(lib ${LIBUSB_LIBRARY_DIRS})
+    LIST(APPEND RTLSDR_PC_LIBS "-L${lib}")
+ENDFOREACH(lib)
+
+FOREACH(inc ${LIBGPS_INCLUDE_DIR})
+    LIST(APPEND RTLSDR_PC_CFLAGS "-I${inc}")
+ENDFOREACH(inc)
+
+FOREACH(lib ${LIBGPS_LIBRARY_DIRS})
     LIST(APPEND RTLSDR_PC_LIBS "-L${lib}")
 ENDFOREACH(lib)
 

@@ -45,6 +45,11 @@
 #include <stdlib.h>
 #include <time.h>
 
+#ifdef GPS_POWER
+#  include <gps.h>
+static struct gps_data_t gpsdata;
+#endif
+
 #ifndef _WIN32
 #include <unistd.h>
 #else
@@ -1005,6 +1010,55 @@ void init_misc(struct misc_settings *ms)
 	ms->time_mode = VERBOSE_TIME;
 }
 
+#ifdef GPS_POWER
+static void gps_quit_handler(int signum)
+{
+    /* don't clutter the logs on Ctrl-C */
+    (void)gps_close(&gpsdata);
+    exit(0);
+}
+
+void *gps_thread(void *arg)
+{
+
+  struct gps_data_t *gpsptr = (struct gps_data_t *)arg; 
+
+  /* initializes the some gpsptr data structure */
+  gpsptr -> status = STATUS_NO_FIX;
+  gpsptr -> satellites_used = 0;
+  gps_clear_fix(&(gpsptr -> fix));
+  gps_clear_dop(&(gpsptr -> dop));
+  
+  /* catch all interesting signals */
+  (void)signal(SIGTERM, gps_quit_handler);
+  (void)signal(SIGQUIT, gps_quit_handler);
+  (void)signal(SIGINT, gps_quit_handler);
+
+  if (gps_open("localhost", "2947", gpsptr) != 0) {
+    (void)fprintf(stderr,
+		  "no gpsd running or network error: %d, %s\n",
+		  errno, gps_errstr(errno));
+    exit(1);
+  }
+
+  (void)gps_stream(gpsptr, 0, NULL);
+
+  for (;;) {
+    if (!gps_waiting(gpsptr, 5000000)) {
+      (void)fprintf(stderr, "error while waiting\n");
+      break;
+    } else {
+      (void)gps_read(gpsptr);
+      // UPDATE GPS
+    }
+  }
+  (void)gps_close(gpsptr);
+  return 0;
+}
+
+#endif
+
+
 int main(int argc, char **argv)
 {
 #ifndef _WIN32
@@ -1169,6 +1223,27 @@ int main(int argc, char **argv)
 	SetConsoleCtrlHandler( (PHANDLER_ROUTINE) sighandler, TRUE );
 #endif
 
+#ifdef GPS_POWER
+      {
+        pthread_t pthread_gps;
+	int i;
+        /* initializes the some gpsdata data structure */
+
+	fprintf(stderr,"Start GPS..\n");
+
+        gpsdata.status = STATUS_NO_FIX;
+        gpsdata.satellites_used = 0;
+        gps_clear_fix(&(gpsdata.fix));
+        gps_clear_dop(&(gpsdata.dop));
+
+        i = pthread_create(&pthread_gps, NULL, gps_thread, &gpsdata);
+        while(! gpsdata.status ) {
+	  fprintf(stderr,"Waiting for gps...\n");
+          sleep(1);
+        }
+      }
+#endif
+
 	if (direct_sampling) {
 		verbose_direct_sampling(dev, direct_sampling);
 	}
@@ -1234,6 +1309,12 @@ int main(int argc, char **argv)
 		}
 		for (i=0; i<tune_count; i++) {
 			fprintf(file, "%s, ", t_str);
+#ifdef GPS_POWER
+			fprintf(file, "%f, %f, %f, ",
+				gpsdata.fix.latitude,
+				gpsdata.fix.longitude,
+				gpsdata.fix.altitude);
+#endif
 			csv_dbm(&tunes[i]);
 		}
 		fflush(file);
